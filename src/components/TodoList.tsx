@@ -1,81 +1,105 @@
-import * as React from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-
-interface Todo {
-  id: number;
-  text: string;
-  completed: boolean;
-}
+import React, { useState } from 'react';
+import { Alert, AlertDescription } from './ui/alert';
+import { Button } from './ui/button';
+import { useTodos } from '../hooks/useTodos';
+import { TodoFilters as TodoFiltersType } from '../types/todo';
+import TodoForm from './TodoForm';
+import TodoFilters from './TodoFilters';
+import TodoItem from './TodoItem';
+import { AlertCircle } from 'lucide-react';
 
 const TodoList: React.FC = () => {
-  const [todos, setTodos] = React.useState<Todo[]>([]);
-  const [newTodo, setNewTodo] = React.useState("");
+  const [filters, setFilters] = useState<TodoFiltersType>({});
+  const {
+    todos,
+    loading,
+    error,
+    createTodo,
+    updateTodo,
+    deleteTodo,
+    toggleTodo,
+    refreshTodos,
+    searchTodos,
+    clearError
+  } = useTodos(filters);
 
-  const addTodo = () => {
-    const text = newTodo.trim();
-    if (!text) {
-      return;
+  const handleFiltersChange = (newFilters: TodoFiltersType) => {
+    setFilters(newFilters);
+    refreshTodos(newFilters);
+  };
+
+  const handleSearch = (query: string) => {
+    if (query.trim()) {
+      searchTodos(query);
+    } else {
+      refreshTodos(filters);
     }
-    setTodos([...todos, { id: Date.now(), text, completed: false }]);
-    setNewTodo("");
   };
 
-  const toggleTodo = (id: number) => {
-    setTodos(
-      todos.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
-    );
-  };
-
-  const removeTodo = (id: number) => {
-    setTodos(todos.filter((todo) => todo.id !== id));
-  };
+  const completedCount = todos.filter(todo => todo.completed).length;
+  const totalCount = todos.length;
 
   return (
-    <div className="max-w-md mx-auto my-8 px-4">
-      <h2 className="text-2xl font-semibold mb-4">Todo List</h2>
-      <div className="flex space-x-2 mb-4">
-        <Input
-          placeholder="Add a new task"
-          value={newTodo}
-          onChange={(e) => setNewTodo(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              addTodo();
-            }
-          }}
-        />
-        <Button onClick={addTodo}>Add</Button>
+    <div className="max-w-6xl mx-auto my-8 px-4 space-y-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Todo List</h1>
+        <p className="text-gray-600">
+          {totalCount > 0 ? `${completedCount}/${totalCount} tasks completed` : 'No tasks yet'}
+        </p>
       </div>
-      <ul className="space-y-2">
-        {todos.map((todo) => (
-          <li
-            key={todo.id}
-            className="flex items-center justify-between bg-white p-2 rounded shadow"
-          >
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={todo.completed}
-                onChange={() => toggleTodo(todo.id)}
-                className="h-4 w-4"
-              />
-              <span
-                className={
-                  todo.completed ? "line-through text-gray-500" : undefined
-                }
-              >
-                {todo.text}
-              </span>
-            </div>
-            <Button variant="destructive" size="sm" onClick={() => removeTodo(todo.id)}>
-              Delete
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            {error}
+            <Button variant="outline" size="sm" onClick={clearError}>
+              Dismiss
             </Button>
-          </li>
-        ))}
-      </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <TodoForm onSubmit={createTodo} loading={loading} />
+      
+      <TodoFilters
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        onSearch={handleSearch}
+      />
+
+      <div className="space-y-4">
+        {loading && todos.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Loading tasks...</p>
+          </div>
+        ) : todos.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No tasks found. Add one above!</p>
+          </div>
+        ) : (
+          todos.map((todo) => (
+            <TodoItem
+              key={todo.id}
+              todo={todo}
+              onToggle={toggleTodo}
+              onDelete={deleteTodo}
+            />
+          ))
+        )}
+      </div>
+      
+      {totalCount > 0 && (
+        <div className="text-center">
+          <Button
+            variant="outline"
+            onClick={() => refreshTodos(filters)}
+            disabled={loading}
+          >
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
